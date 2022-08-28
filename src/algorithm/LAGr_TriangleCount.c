@@ -181,100 +181,35 @@ int LAGr_TriangleCount
     GrB_Monoid monoid = GrB_PLUS_MONOID_INT64 ;
 
     //--------------------------------------------------------------------------
-    // heuristic sort rule
-    //--------------------------------------------------------------------------
-
-    if (auto_sort)
-    {
-        // auto selection of sorting method
-        (*presort) = LAGraph_TriangleCount_NoSort ; // default is not to sort
-
-        if (method_can_use_presort)
-        {
-            // This rule is very similar to Scott Beamer's rule in the GAP TC
-            // benchmark, except that it is extended to handle the ascending
-            // sort needed by methods 3 and 5.  It also uses a stricter rule,
-            // since the performance of triangle counting in SuiteSparse:
-            // GraphBLAS is less sensitive to the sorting as compared to the
-            // GAP algorithm.  This is because the dot products in SuiteSparse:
-            // GraphBLAS use binary search if one vector is very sparse
-            // compared to the other.  As a result, SuiteSparse:GraphBLAS needs
-            // the sort for fewer matrices, as compared to the GAP algorithm.
-
-            // With this rule, the GAP-kron and GAP-twitter matrices are
-            // sorted, and the others remain unsorted.  With the rule in the
-            // GAP tc.cc benchmark, GAP-kron and GAP-twitter are sorted, and so
-            // is GAP-web, but GAP-web is not sorted here.
-
-            #define NSAMPLES 1000
-            GrB_Index nvals ;
-            GRB_TRY (GrB_Matrix_nvals (&nvals, A)) ;
-            if (n > NSAMPLES && ((double) nvals / ((double) n)) >= 10)
-            {
-                // estimate the mean and median degrees
-                double mean, median ;
-                LG_TRY (LAGraph_SampleDegree (&mean, &median,
-                    G, true, NSAMPLES, n, msg)) ;
-                // sort if the average degree is very high vs the median
-                if (mean > 4 * median)
-                {
-                    switch (method)
-                    {
-                        case LAGraph_TriangleCount_Sandia:
-                            // 3:sum (sum ((L * L) .* L))
-                            (*presort) = LAGraph_TriangleCount_Ascending  ;
-                            break ;
-                        case LAGraph_TriangleCount_Sandia2:
-                            // 4: sum (sum ((U * U) .* U))
-                            (*presort) = LAGraph_TriangleCount_Descending ;
-                            break ;
-                        default:
-                        case LAGraph_TriangleCount_SandiaDot:
-                            // 5: sum (sum ((L * U') .* L))
-                            (*presort) = LAGraph_TriangleCount_Ascending  ;
-                            break ;
-                        case LAGraph_TriangleCount_SandiaDot2:
-                            // 6: sum (sum ((U * L') .* U))
-                            (*presort) = LAGraph_TriangleCount_Descending ;
-                            break ;
-                    }
-                }
-            }
-        }
-    }
-
-    //--------------------------------------------------------------------------
-    // sort the input matrix, if requested
-    //--------------------------------------------------------------------------
-
-    if (presort != NULL && (*presort) != LAGraph_TriangleCount_NoSort)
-    {
-        // P = permutation that sorts the rows by their degree
-        LG_TRY (LAGraph_SortByDegree (&P, G, true,
-            (*presort) == LAGraph_TriangleCount_Ascending, msg)) ;
-
-        // T = A (P,P) and typecast to boolean
-        GRB_TRY (GrB_Matrix_new (&T, GrB_BOOL, n, n)) ;
-        GRB_TRY (GrB_extract (T, NULL, NULL, A, (GrB_Index *) P, n,
-            (GrB_Index *) P, n, NULL)) ;
-        A = T ;
-
-        // free workspace
-        LG_TRY (LAGraph_Free ((void **) &P, NULL)) ;
-    }
-
-    //--------------------------------------------------------------------------
     // count triangles
     //--------------------------------------------------------------------------
 
     int64_t ntri ;
 
+    Desc_value multiplication_mode = GrB_IKJ_MASKED;
+    if (desc) {
+        backend::Descriptor* desc_t =  desc->get_descriptor();
+        desc_t->get(GrB_MXMMODE, &multiplication_mode);
+    }
+
+    Descriptor mxm_desc;
+    if (multiplication_mode == GrB_IJK_DOUBLE_SORT) {
+        mxm_desc = GrB_DESC_IJK_DOUBLE_SORT;
+    } else if (multiplication_mode == GrB_ESC_MASKED) {
+        mxm_desc = GrB_DESC_ESC_MASKED;
+    } else {
+        mxm_desc = GrB_DESC_IKJ_MASKED;
+    }
+
     switch (method)
     {
 
         case LAGraph_TriangleCount_Burkhardt:  // 1: sum (sum ((A^2) .* A)) / 6
-
-            GRB_TRY (GrB_mxm (C, A, NULL, semiring, A, A, GrB_DESC_S)) ;
+            if (multiplication_mode == GrB_IJK_DOUBLE_SORT) {
+                A->get_matrix()->sort_csr_columns("STL_SORT");
+                A->get_matrix()->sort_csc_rows("STL_SORT");
+            }
+            GRB_TRY (GrB_mxm (C, A, NULL, semiring, A, A, &mxm_desc)) ;
             GRB_TRY (GrB_reduce (&ntri, NULL, monoid, C, NULL)) ;
             ntri /= 6 ;
             break ;
@@ -282,7 +217,13 @@ int LAGr_TriangleCount
         case LAGraph_TriangleCount_Cohen: // 2: sum (sum ((L * U) .* A)) / 2
 
             LG_TRY (tricount_prep (&L, &U, A, msg)) ;
-            GRB_TRY (GrB_mxm (C, A, NULL, semiring, L, U, GrB_DESC_S)) ;
+
+            if (multiplication_mode == GrB_IJK_DOUBLE_SORT) {
+                L->get_matrix()->sort_csr_columns("STL_SORT");
+                U->get_matrix()->sort_csc_rows("STL_SORT");
+            }
+
+            GRB_TRY (GrB_mxm (C, A, NULL, semiring, L, U, &mxm_desc)) ;
             GRB_TRY (GrB_reduce (&ntri, NULL, monoid, C, NULL)) ;
             ntri /= 2 ;
             break ;
@@ -291,7 +232,11 @@ int LAGr_TriangleCount
 
             // using the masked saxpy3 method
             LG_TRY (tricount_prep (&L, NULL, A, msg)) ;
-            GRB_TRY (GrB_mxm (C, L, NULL, semiring, L, L, GrB_DESC_S)) ;
+            if (multiplication_mode == GrB_IJK_DOUBLE_SORT) {
+                L->get_matrix()->sort_csr_columns("STL_SORT");
+                L->get_matrix()->sort_csc_rows("STL_SORT");
+            }
+            GRB_TRY (GrB_mxm (C, L, NULL, semiring, L, L, &mxm_desc)) ;
             GRB_TRY (GrB_reduce (&ntri, NULL, monoid, C, NULL)) ;
             break ;
 
@@ -299,7 +244,11 @@ int LAGr_TriangleCount
 
             // using the masked saxpy3 method
             LG_TRY (tricount_prep (NULL, &U, A, msg)) ;
-            GRB_TRY (GrB_mxm (C, U, NULL, semiring, U, U, GrB_DESC_S)) ;
+            if (multiplication_mode == GrB_IJK_DOUBLE_SORT) {
+                U->get_matrix()->sort_csr_columns("STL_SORT");
+                U->get_matrix()->sort_csc_rows("STL_SORT");
+            }
+            GRB_TRY (GrB_mxm (C, U, NULL, semiring, U, U, &mxm_desc)) ;
             GRB_TRY (GrB_reduce (&ntri, NULL, monoid, C, NULL)) ;
             break ;
 
@@ -311,7 +260,11 @@ int LAGr_TriangleCount
 
             // using the masked dot product
             LG_TRY (tricount_prep (&L, &U, A, msg)) ;
-            GRB_TRY (GrB_mxm (C, L, NULL, semiring, L, U, GrB_DESC_ST1)) ;
+            if (multiplication_mode == GrB_IJK_DOUBLE_SORT) {
+                U->get_matrix()->sort_csc_rows("STL_SORT");
+                L->get_matrix()->sort_csr_columns("STL_SORT");
+            }
+            GRB_TRY (GrB_mxm (C, L, NULL, semiring, L, U, &mxm_desc)) ;
             GRB_TRY (GrB_reduce (&ntri, NULL, monoid, C, NULL)) ;
             break ;
 
@@ -319,7 +272,11 @@ int LAGr_TriangleCount
 
             // using the masked dot product
             LG_TRY (tricount_prep (&L, &U, A, msg)) ;
-            GRB_TRY (GrB_mxm (C, U, NULL, semiring, U, L, GrB_DESC_ST1)) ;
+            if (multiplication_mode == GrB_IJK_DOUBLE_SORT) {
+                U->get_matrix()->sort_csr_columns("STL_SORT");
+                L->get_matrix()->sort_csc_rows("STL_SORT");
+            }
+            GRB_TRY (GrB_mxm (C, U, NULL, semiring, U, L, &mxm_desc)) ;
             GRB_TRY (GrB_reduce (&ntri, NULL, monoid, C, NULL)) ;
             break ;
     }
