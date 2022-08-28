@@ -31,13 +31,13 @@
             <td class="headerValue">LAGraph code coverage report. Commit id: b01084a. Current time (UTC): 2022-08-28T15:06:15Z</td>
             <td></td>
             <td class="headerItem">Lines:</td>
-            <td class="headerCovTableEntry">142</td>
-            <td class="headerCovTableEntry">142</td>
+            <td class="headerCovTableEntry">145</td>
+            <td class="headerCovTableEntry">145</td>
             <td class="headerCovTableEntryHi">100.0 %</td>
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2022-08-28 15:07:12</td>
+            <td class="headerValue">2022-08-28 15:07:17</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">2</td>
@@ -190,9 +190,9 @@
 <a name="128"><span class="lineNum">     128 </span>            :             // ensure the matrix is not iso</a>
 <a name="129"><span class="lineNum">     129 </span>            :             #if LAGRAPH_SUITESPARSE</a>
 <a name="130"><span class="lineNum">     130 </span>            :             #if GxB_IMPLEMENTATION &lt; GxB_VERSION (6,0,3)</a>
-<a name="131"><span class="lineNum">     131 </span>            :             printf (&quot;workaround for bug in SS:GrB v6.0.2 (fixed in v6.0.3)\n&quot;) ;</a>
-<a name="132"><span class="lineNum">     132 </span>            :             OK (GrB_Matrix_setElement (A, 0, 0, 0)) ;</a>
-<a name="133"><span class="lineNum">     133 </span>            :             OK (GrB_wait (A, GrB_MATERIALIZE)) ;</a>
+<a name="131"><span class="lineNum">     131 </span><span class="lineCov">        204 :             printf (&quot;workaround for bug in SS:GrB v6.0.2 (fixed in v6.0.3)\n&quot;) ;</span></a>
+<a name="132"><span class="lineNum">     132 </span><span class="lineCov">        204 :             OK (GrB_Matrix_setElement (A, 0, 0, 0)) ;</span></a>
+<a name="133"><span class="lineNum">     133 </span><span class="lineCov">        204 :             OK (GrB_wait (A, GrB_MATERIALIZE)) ;</span></a>
 <a name="134"><span class="lineNum">     134 </span>            :             #endif</a>
 <a name="135"><span class="lineNum">     135 </span>            :             #endif</a>
 <a name="136"><span class="lineNum">     136 </span>            : </a>
