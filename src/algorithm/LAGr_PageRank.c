@@ -162,8 +162,9 @@ int LAGr_PageRank
         // r = teleport
         GRB_TRY (GrB_assign (r, NULL, NULL, teleport, GrB_ALL, n, NULL)) ;
         // r += A'*w
-        GRB_TRY (GrB_mxv (r, NULL, GrB_PLUS_FP32, LAGraph_plus_second_fp32,
-            AT, w, NULL)) ;
+        // WARNING! USING SAVE_STATS MACRO
+        SAVE_STATS(GRB_TRY (GrB_mxv (r, NULL, GrB_PLUS_FP32, LAGraph_plus_second_fp32,
+            AT, w, NULL)), "pr_mxv", (sizeof(float)*2 + sizeof(size_t)), 1, AT) ;
         // t -= r
         GRB_TRY (GrB_assign (t, NULL, GrB_MINUS_FP32, r, GrB_ALL, n, NULL)) ;
         // t = abs (t)
