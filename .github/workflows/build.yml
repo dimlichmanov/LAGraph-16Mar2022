@@ -1,0 +1,78 @@
+name: LAGraph CI
+
+on: [push, pull_request]
+
+jobs:
+  linux:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        config:
+         - {grb_version: 6.0.2, conda_grb_package_hash: h9c3ff4c}
+         - {grb_version: 6.1.4, conda_grb_package_hash: h9c3ff4c}
+         - {grb_version: 6.2.4, conda_grb_package_hash: h27087fc}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2.0.0
+    - name: Install tools for build
+      run: |
+        sudo apt install -y lcov
+    - name: Get GraphBLAS binaries
+      run: |
+        mkdir graphblas-binaries
+        cd graphblas-binaries
+        wget --quiet https://anaconda.org/conda-forge/graphblas/${{ matrix.config.grb_version }}/download/linux-64/graphblas-${{ matrix.config.grb_version }}-${{ matrix.config.conda_grb_package_hash }}_0.tar.bz2
+        tar xf graphblas-${{ matrix.config.grb_version }}-${{ matrix.config.conda_grb_package_hash }}_0.tar.bz2
+        cd ..
+    - name: Build project
+      run: |
+        export GRAPHBLAS_INCLUDE_DIR=`pwd`/graphblas-binaries/include
+        export GRAPHBLAS_LIBRARY=`pwd`/graphblas-binaries/lib/libgraphblas.so
+        cd build
+        cmake .. -DCOVERAGE=1 -DGRAPHBLAS_INCLUDE_DIR=${GRAPHBLAS_INCLUDE_DIR} -DGRAPHBLAS_LIBRARY=${GRAPHBLAS_LIBRARY}
+        JOBS=2 make
+        make test_coverage
+    - name: Deploy
+      uses: JamesIves/github-pages-deploy-action@4.1.1
+      with:
+        branch: gh-pages
+        folder: build/test_coverage/
+      if: ${{ matrix.config.grb_version }} == '6.2.4' && github.event_name == 'push' && github.ref == 'refs/heads/reorg'
+    - name: Save output
+      uses: actions/upload-artifact@v2.2.3
+      with:
+        name: test_coverage
+        path: build/test_coverage/
+  macos:
+    runs-on: macos-10.15
+    strategy:
+      matrix:
+        config:
+         - {grb_version: 6.0.2, conda_grb_package_hash: h4a89273}
+         - {grb_version: 6.1.4, conda_grb_package_hash: h4a89273}
+         - {grb_version: 6.2.4, conda_grb_package_hash: h3f3baac}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2.0.0
+    - name: Install dependencies
+      run: |
+        brew install libomp
+    - name: Get GraphBLAS binaries
+      run: |
+        mkdir graphblas-binaries
+        cd graphblas-binaries
+        wget --quiet https://anaconda.org/conda-forge/graphblas/${{ matrix.config.grb_version }}/download/osx-64/graphblas-${{ matrix.config.grb_version }}-${{ matrix.config.conda_grb_package_hash }}_0.tar.bz2
+        tar xf graphblas-${{ matrix.config.grb_version }}-${{ matrix.config.conda_grb_package_hash }}_0.tar.bz2
+        cd ..
+    - name: Build project
+      run: |
+        export GRAPHBLAS_INCLUDE_DIR=`pwd`/graphblas-binaries/include
+        export GRAPHBLAS_LIBRARY=`pwd`/graphblas-binaries/lib/libgraphblas.dylib
+        # adding an extra line to the CMakeLists.txt file to locate the libomp instance installed by brew
+        mv CMakeLists.txt CMakeLists2.txt
+        echo 'include_directories("/usr/local/opt/libomp/include")' > CMakeLists1.txt
+        cat CMakeLists1.txt CMakeLists2.txt > CMakeLists.txt
+        cd build
+        CC=gcc cmake .. -DGRAPHBLAS_INCLUDE_DIR=${GRAPHBLAS_INCLUDE_DIR} -DGRAPHBLAS_LIBRARY=${GRAPHBLAS_LIBRARY}
+        JOBS=2 make
+        make test

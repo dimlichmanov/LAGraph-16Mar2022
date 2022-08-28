@@ -1,0 +1,74 @@
+As of Mar 11, 2022:
+
+    * entire user guide
+        experimental -> src, how to do it.
+        HTML vs PDF vs ... link into PDF ...
+        write it in LaTeX
+        also update top-level README.txt
+        see also https://github.com/GraphBLAS/LAGraph-Docs .
+
+    * document all src & experimental: algorithms, utilities, and tests.
+
+    * draft name scheme:  LAGraph_* are Basic algorithms, LAGr_* are Advanced
+        Basic: in/out, can set properties
+        Adv: in only, prop must be provided on input, can also have extra
+            parameters, ...
+
+    * check function names and API
+
+    * add FUTURE to User Guide (see below)
+
+    * error messages in src/benchmark
+
+--------------------------------------------------------------------------------
+add FUTURE items as a section in the User Guide:
+
+FUTURE: LAGraph_SingleSourceShortestPath:  Write a Basic method that
+            computes G->emin (that's easy).  And G->emax so it can decide on
+            Delta on its own (hard to do).
+
+FUTURE: LAGraph_BreadthFirstSearch basic method that computes G->AT
+        and G->rowdegree first.
+
+FUTURE: all algorithms can use Basic and Advanced variants.
+
+FUTURE: file I/O with a common, binary, non-opaque format that all
+            GraphBLAS libraries can read.  Ideally using compression
+            (see SuiteSparse:GraphBLAS uses LZ4 for its GrB_Matrix_serialize/
+            deserialize and it would not be hard to add LZ4 to LAGraph).
+            We could add the format to the *.lagraph file format now used
+            by the experimental/utility/LAGraph_S*.c methods.  That is, the
+            same file format *.lagraph could include matrices in either
+            the universal format, or a library-specific format.  The format
+            would be specified by the json header in the *.lagraph file.
+            See the doc/lagraph_format.txt file for details.
+
+            Tim D. moved this to FUTURE.  It would require
+            the LAGraph_SLoad, *SSave, etc to move from experimental to src,
+            and those functions need work (API design, text compression).
+            Adding this feature also requires an LAGraph_serialize/deserialize,
+            which requies LZ4 compression.  We could do this for v1.1.
+
+FUTURE: can we exploit asynch algorithms? C += A*C for example?
+        Gauss-Seidel, Afforest, etc?  I can do it in GraphBLAS; can LAGraph
+        use it?
+
+FUTURE: for LG_CC_FastSV6.c:
+
+    * need new GxB methods in GraphBLAS for CC,
+        GxB_select with GxB_RankUnaryOp, and GxB_extract with GrB_Vectors as
+        inputs instead of (GrB_Index *) arrays.
+
+FUTURE: add interfaces to external packages.
+
+    GTgraph: (Madduri and Bader) for generating synthetic graphs
+    CSparse or CXSparse (for depth-first search, scc, dmperm, amd,
+        in the sequential case)
+    graph partitioning: METIS, Mongoose, etc
+    SuiteSparse solvers (UMFPACK, CHOLMOD, KLU, SPQR, ...)
+    others?
+
+FUTURE: interfaces to MATLAB, Python, Julia, etc.
+
+FUTURE: need more algorithms and utilities
+
